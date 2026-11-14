@@ -43,7 +43,7 @@ Python 3.12+ и собственные токены платформ/API. Одн
 | Grok | `XAI_API_KEY`, `XAI_MODEL` | xAI chat completions |
 | OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | OpenAI-compatible chat completions |
 
-Стартовые model ID сверены с текущими каталогами API на 14 ноября 2026 года: `gpt-6-astra`, `claude-sonnet-5`, `gemini-3.8-flash`, `grok-4.7` и `openrouter/free`. Доступность всё равно зависит от аккаунта и региона; можно заменить любой ID в `.env`. Провайдеры меняют модели, тарифы и лимиты.
+Стартовые model ID сверены с текущими каталогами API на 14 ноября 2026 года: `gpt-6-astra`, `claude-sonnet-5-5`, `gemini-3.8-flash`, `grok-4.7` и `openrouter/free`. Доступность всё равно зависит от аккаунта и региона; можно заменить любой ID в `.env`. Провайдеры меняют модели, тарифы и лимиты.
 
 Для выбора провайдера:
 - Discord: `/provider openrouter`
