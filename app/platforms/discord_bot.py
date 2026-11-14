@@ -20,6 +20,11 @@ def _chunks(text: str, limit: int = 1850) -> list[str]:
     return result or ["Пустой ответ."]
 
 
+class GlitchDiscordBot(commands.Bot):
+    async def setup_hook(self) -> None:
+        await self.tree.sync()
+
+
 class DiscordAdapter:
     def __init__(self, token: str, service: ChatService) -> None:
         self.token = token
@@ -27,7 +32,7 @@ class DiscordAdapter:
         self.providers_by_user: dict[int, str] = {}
 
         intents = discord.Intents.default()
-        self.bot = commands.Bot(command_prefix="!", intents=intents)
+        self.bot = GlitchDiscordBot(command_prefix="!", intents=intents)
 
         @self.bot.event
         async def on_ready() -> None:
