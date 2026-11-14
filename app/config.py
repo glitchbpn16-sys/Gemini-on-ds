@@ -57,6 +57,25 @@ class Settings:
         except ValueError as exc:
             raise ValueError("PORT must be an integer") from exc
 
+        provider_keys = {
+            "openai": value("OPENAI_API_KEY"),
+            "anthropic": value("ANTHROPIC_API_KEY"),
+            "gemini": value("GEMINI_API_KEY"),
+            "xai": value("XAI_API_KEY"),
+            "openrouter": value("OPENROUTER_API_KEY"),
+        }
+        configured = [name for name, key in provider_keys.items() if key]
+        requested_provider = value("AI_DEFAULT_PROVIDER")
+        default_provider = (
+            requested_provider.lower()
+            if requested_provider
+            else (
+                "openrouter"
+                if provider_keys["openrouter"]
+                else configured[0] if configured else "openrouter"
+            )
+        )
+
         return cls(
             discord_token=value("DISCORD_BOT_TOKEN"),
             telegram_token=value("TELEGRAM_BOT_TOKEN"),
@@ -66,7 +85,7 @@ class Settings:
             gemini_api_key=value("GEMINI_API_KEY"),
             xai_api_key=value("XAI_API_KEY"),
             openrouter_api_key=value("OPENROUTER_API_KEY"),
-            default_provider=(value("AI_DEFAULT_PROVIDER") or "openrouter").lower(),
+            default_provider=default_provider,
             fallback_order=fallback,
             models=models,
             system_prompt=value("AI_SYSTEM_PROMPT")
