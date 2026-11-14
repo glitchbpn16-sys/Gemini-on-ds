@@ -80,9 +80,7 @@ class ProviderGateway:
                         "input": [
                             {
                                 "role": message["role"],
-                                "content": [
-                                    {"type": "input_text", "text": message["content"]}
-                                ],
+                                "content": message["content"],
                             }
                             for message in messages
                         ],
@@ -95,7 +93,7 @@ class ProviderGateway:
                     "https://api.anthropic.com/v1/messages",
                     {
                         "x-api-key": key,
-                        "anthropic-version": "2023-06-01",
+                        "anthropic-version": "2026-10-21",
                     },
                     {
                         "model": self.settings.model(provider),
