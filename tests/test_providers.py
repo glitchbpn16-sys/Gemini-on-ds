@@ -48,7 +48,7 @@ def run_gateway(
 def test_current_default_model_ids() -> None:
     assert DEFAULT_MODELS == {
         "openai": "gpt-6-astra",
-        "anthropic": "claude-sonnet-5",
+        "anthropic": "claude-sonnet-5-5",
         "gemini": "gemini-3.8-flash",
         "xai": "grok-4.7",
         "openrouter": "openrouter/free",
