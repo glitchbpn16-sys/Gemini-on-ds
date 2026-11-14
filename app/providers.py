@@ -92,7 +92,7 @@ class ProviderGateway:
                 data = await self._post(
                     "https://api.anthropic.com/v1/messages",
                     {
-                        "x-api-key": key,
+                        "Authorization": f"Bearer {key}",
                         "anthropic-version": "2026-10-21",
                     },
                     {
