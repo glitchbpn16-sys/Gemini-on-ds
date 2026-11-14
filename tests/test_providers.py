@@ -147,9 +147,8 @@ def test_provider_endpoint_headers_and_payload(
     assert provider == provider_name
     assert answer.endswith("ответ")
     assert seen["url"] == expected_url
-    assert seen["headers"]["authorization"] == "Bearer unit-test-token"
-
     if provider_name == "anthropic":
+        assert seen["headers"]["x-api-key"] == "unit-test-token"
         assert seen["headers"]["anthropic-version"] == "2026-10-21"
         assert seen["body"]["model"] == "claude-sonnet-5"
         assert seen["body"]["max_tokens"] == settings.max_output_tokens
@@ -158,9 +157,11 @@ def test_provider_endpoint_headers_and_payload(
         assert seen["body"]["systemInstruction"]["parts"][0]["text"]
         assert seen["body"]["contents"][0]["role"] == "user"
     elif provider_name == "xai":
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "grok-4.7"
         assert seen["body"]["messages"][0]["role"] == "system"
     else:
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "openrouter/free"
         assert seen["headers"]["x-title"] == "Glitch AI Bridge"
         assert seen["body"]["messages"][0]["role"] == "system"
