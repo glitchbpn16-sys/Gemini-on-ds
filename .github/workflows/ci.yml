@@ -24,5 +24,7 @@ jobs:
           pip install -r requirements.txt
       - name: Compile
         run: python -m compileall -q app bot.py
+      - name: Import smoke test
+        run: python -c "import app.main"
       - name: Test
-        run: pytest -q
+        run: python -m pytest -q
