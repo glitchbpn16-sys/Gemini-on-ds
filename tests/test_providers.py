@@ -165,3 +165,35 @@ def test_provider_endpoint_headers_and_payload(
         assert seen["body"]["model"] == "openrouter/free"
         assert seen["headers"]["x-title"] == "Glitch AI Bridge"
         assert seen["body"]["messages"][0]["role"] == "system"
+
+
+
+def test_default_provider_prefers_openrouter_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AI_DEFAULT_PROVIDER", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-token")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-token")
+    settings = Settings.from_env()
+    assert settings.default_provider == "openrouter"
+
+
+def test_default_provider_falls_back_to_first_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AI_DEFAULT_PROVIDER", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-token")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "claude-token")
+    settings = Settings.from_env()
+    assert settings.default_provider == "openai"
+
+
+def test_explicit_default_provider_is_respected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_DEFAULT_PROVIDER", "anthropic")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-token")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "claude-token")
+    settings = Settings.from_env()
+    assert settings.default_provider == "anthropic"
