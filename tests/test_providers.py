@@ -148,9 +148,9 @@ def test_provider_endpoint_headers_and_payload(
     assert answer.endswith("ответ")
     assert seen["url"] == expected_url
     if provider_name == "anthropic":
-        assert seen["headers"]["x-api-key"] == "unit-test-token"
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["headers"]["anthropic-version"] == "2026-10-21"
-        assert seen["body"]["model"] == "claude-sonnet-5"
+        assert seen["body"]["model"] == "claude-sonnet-5-5"
         assert seen["body"]["max_tokens"] == settings.max_output_tokens
     elif provider_name == "gemini":
         assert seen["headers"]["x-goog-api-key"] == "unit-test-token"
