@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import hmac
-import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
@@ -68,18 +67,15 @@ def create_mcp_app(service: ChatService, access_token: str):
             raise ValueError(
                 f"Message exceeds the {service.settings.max_prompt_chars}-character limit"
             )
-
-        conversation_id = f"mcp:{secrets.token_urlsafe(18)}"
-        try:
-            selected_provider, answer = await service.ask(
-                conversation_id,
-                message,
-                provider.strip() or None,
-            )
-            return f"[{selected_provider}] {answer}"
-        finally:
-            # Isolate requests and promptly release their short-lived context.
-            service.clear(conversation_id)
+        # One shared limiter key prevents clients from evading quotas by creating
+        # fresh conversation IDs. MCP calls are stateless and do not retain history.
+        if not service.limiter.allow("mcp"):
+            raise ValueError("MCP request limit reached; try again later")
+        selected_provider, answer = await service.gateway.complete(
+            [{"role": "user", "content": message}],
+            provider.strip() or None,
+        )
+        return f"[{selected_provider}] {answer}"
 
     mcp_app = server.streamable_http_app(
         json_response=True,
