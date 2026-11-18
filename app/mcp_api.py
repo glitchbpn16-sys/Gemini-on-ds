@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import hmac
 import secrets
-from typing import Annotated
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
-from mcp.server import MCPServer
-from mcp.types import ToolAnnotations
-from pydantic import Field
+from mcp.server.mcpserver import MCPServer
+from starlette.applications import Starlette
 from starlette.responses import Response
+from starlette.routing import Mount
 
 from app.service import ChatService
 
@@ -15,13 +17,13 @@ from app.service import ChatService
 class BearerAuthMiddleware:
     """Protect every MCP HTTP request with a constant-time Bearer check."""
 
-    def __init__(self, app, access_token: str) -> None:
+    def __init__(self, app: Callable[..., Awaitable[None]], access_token: str) -> None:
         if not access_token:
-            raise ValueError("MCP access token must not be empty")
+            raise ValueError("MCP_API_TOKEN is required when MCP is enabled")
         self.app = app
         self.expected = f"Bearer {access_token}"
 
-    async def __call__(self, scope, receive, send) -> None:
+    async def __call__(self, scope: dict[str, Any], receive, send) -> None:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -44,45 +46,54 @@ class BearerAuthMiddleware:
 
 
 def create_mcp_app(service: ChatService, access_token: str):
-    """Create an MCP Streamable HTTP server with a deliberately small toolset."""
+    """Create an authenticated, stateless Streamable HTTP MCP server."""
     if not access_token:
         raise ValueError("MCP_API_TOKEN is required when MCP is enabled")
 
     server = MCPServer("Glitch AI Bridge")
 
-    @server.tool(
-        annotations=ToolAnnotations(
-            read_only_hint=True,
-            open_world_hint=False,
-        )
-    )
-    def list_ai_providers() -> list[str]:
-        """List AI providers configured by the server owner."""
-        return service.available_providers()
+    @server.tool()
+    def list_ai_providers() -> str:
+        """List the AI providers configured by the server owner."""
+        providers = service.available_providers()
+        return ", ".join(providers) if providers else "No providers configured"
 
     @server.tool()
-    async def ask_ai(
-        message: Annotated[
-            str,
-            Field(min_length=1, max_length=8000, description="Message to send to the selected AI provider."),
-        ],
-        provider: Annotated[
-            str | None,
-            Field(default=None, max_length=40, description="Optional configured provider name."),
-        ] = None,
-    ) -> str:
-        """Send one request to a configured AI provider; no shell or device-control tools are exposed."""
+    async def ask_ai(message: str, provider: str = "") -> str:
+        """Send a bounded request to a configured AI provider; no shell or device-control tools are exposed."""
+        message = message.strip()
+        if not message:
+            raise ValueError("Message must not be empty")
+        if len(message) > service.settings.max_prompt_chars:
+            raise ValueError(
+                f"Message exceeds the {service.settings.max_prompt_chars}-character limit"
+            )
+
         conversation_id = f"mcp:{secrets.token_urlsafe(18)}"
         try:
-            selected, answer = await service.ask(
+            selected_provider, answer = await service.ask(
                 conversation_id,
                 message,
-                provider,
+                provider.strip() or None,
             )
-            return f"[{selected}] {answer}"
+            return f"[{selected_provider}] {answer}"
         finally:
-            # MCP calls are isolated; they do not share or persist chat history.
+            # Isolate requests and promptly release their short-lived context.
             service.clear(conversation_id)
 
-    app = server.streamable_http_app()
+    mcp_app = server.streamable_http_app(
+        json_response=True,
+        stateless_http=True,
+        host="127.0.0.1",
+    )
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_: Starlette) -> AsyncIterator[None]:
+        async with server.session_manager.run():
+            yield
+
+    app = Starlette(
+        routes=[Mount("/", app=mcp_app)],
+        lifespan=lifespan,
+    )
     return BearerAuthMiddleware(app, access_token)
