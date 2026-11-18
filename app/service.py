@@ -9,8 +9,12 @@ class ChatService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.gateway = ProviderGateway(settings)
-        self.memory = ConversationMemory(max_messages=20)
-        self.limiter = RateLimiter(limit=8, window_seconds=60)
+        # Keep only a modest short-lived context window in RAM.
+        self.memory = ConversationMemory(max_messages=12)
+        self.limiter = RateLimiter(
+            limit=settings.requests_per_minute,
+            window_seconds=60,
+        )
 
     def available_providers(self) -> list[str]:
         return self.gateway.available()
