@@ -5,11 +5,10 @@ import asyncio
 import uvicorn
 
 from app.config import Settings
+from app.mod_api import create_mod_app
 from app.platforms.discord_bot import DiscordAdapter
 from app.platforms.telegram_bot import TelegramAdapter
-from app.providers import ProviderError
 from app.service import ChatService
-from app.mod_api import create_mod_app
 
 
 async def main() -> None:
@@ -18,7 +17,7 @@ async def main() -> None:
     available = service.available_providers()
     if not available:
         raise SystemExit(
-            "Не настроен ни один AI API. Добавь хотя бы один ключ провайдера "
+            "Не настроен ни один AI API. Добавь ключ или CUSTOM_OPENAI_BASE_URL "
             "в переменные окружения; см. .env.example."
         )
 
@@ -51,16 +50,34 @@ async def main() -> None:
             port=settings.port,
             log_level="warning",
             access_log=False,
+            limit_concurrency=16,
+            timeout_keep_alive=5,
         )
         tasks.append(
             asyncio.create_task(uvicorn.Server(config).serve(), name="mods-api")
         )
 
+    if settings.mcp_enabled and settings.mcp_api_token:
+        from app.mcp_api import create_mcp_app
+
+        config = uvicorn.Config(
+            create_mcp_app(service, settings.mcp_api_token),
+            host=settings.mcp_host,
+            port=settings.mcp_port,
+            log_level="warning",
+            access_log=False,
+            limit_concurrency=8,
+            timeout_keep_alive=5,
+        )
+        tasks.append(
+            asyncio.create_task(uvicorn.Server(config).serve(), name="mcp-connect")
+        )
+
     if not tasks:
         await service.gateway.close()
         raise SystemExit(
-            "Нет включённых платформ. Укажи DISCORD_BOT_TOKEN, "
-            "TELEGRAM_BOT_TOKEN и/или MODS_API_TOKEN."
+            "Нет включённых платформ. Укажи Discord/Telegram token, MODS_API_TOKEN "
+            "или включи MCP_ENABLED=true с отдельным MCP_API_TOKEN."
         )
 
     print(f"Glitch AI Bridge started. AI providers: {', '.join(available)}")
@@ -71,3 +88,7 @@ async def main() -> None:
             if not task.done():
                 task.cancel()
         await service.gateway.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -12,15 +13,21 @@ class ProviderError(RuntimeError):
 
 
 class ProviderGateway:
-    """Small REST gateway for five independently configured model providers."""
+    """REST gateway for first-party and custom OpenAI-compatible APIs."""
 
     def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None):
         self.settings = settings
         self._owns_client = client is None
-        self.client = client or httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, connect=15.0),
-            limits=httpx.Limits(max_connections=30, max_keepalive_connections=10),
+        timeout = httpx.Timeout(
+            float(settings.request_timeout_seconds),
+            connect=min(15.0, float(settings.request_timeout_seconds)),
         )
+        self.client = client or httpx.AsyncClient(
+            timeout=timeout,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
+        # Keep concurrent requests bounded; no busy background polling is used.
+        self._semaphore = asyncio.Semaphore(settings.max_concurrent_ai_requests)
 
     async def close(self) -> None:
         if self._owns_client:
@@ -35,11 +42,18 @@ class ProviderGateway:
         preferred_provider: str | None = None,
     ) -> tuple[str, str]:
         provider = (preferred_provider or self.settings.default_provider).lower()
-        if provider not in {"openai", "anthropic", "gemini", "xai", "openrouter"}:
+        if provider not in {
+            "openai",
+            "anthropic",
+            "gemini",
+            "xai",
+            "openrouter",
+            "custom",
+        }:
             raise ProviderError("Неизвестный провайдер. Используй /providers.")
-        if not self.settings.api_key(provider):
+        if provider not in self.available():
             raise ProviderError(
-                f"Провайдер {provider} не настроен: добавь его ключ в переменные окружения."
+                f"Провайдер {provider} не настроен: проверь переменные окружения."
             )
 
         order = [provider]
@@ -48,14 +62,15 @@ class ProviderGateway:
                 order.append(fallback)
 
         failures: list[str] = []
-        for candidate in order:
-            try:
-                answer = await self._request(candidate, messages)
-                return candidate, answer
-            except ProviderError as exc:
-                failures.append(f"{candidate}: {exc}")
-                if candidate == provider and not self.settings.fallback_order:
-                    break
+        async with self._semaphore:
+            for candidate in order:
+                try:
+                    answer = await self._request(candidate, messages)
+                    return candidate, answer
+                except ProviderError as exc:
+                    failures.append(f"{candidate}: {exc}")
+                    if candidate == provider and not self.settings.fallback_order:
+                        break
 
         raise ProviderError(
             "Не удалось получить ответ ни от одного настроенного провайдера. "
@@ -66,7 +81,7 @@ class ProviderGateway:
         self, provider: str, messages: list[dict[str, str]]
     ) -> str:
         key = self.settings.api_key(provider)
-        if not key:
+        if not key and provider != "custom":
             raise ProviderError("ключ не настроен")
 
         try:
@@ -78,11 +93,8 @@ class ProviderGateway:
                         "model": self.settings.model(provider),
                         "instructions": self.settings.system_prompt,
                         "input": [
-                            {
-                                "role": message["role"],
-                                "content": message["content"],
-                            }
-                            for message in messages
+                            {"role": item["role"], "content": item["content"]}
+                            for item in messages
                         ],
                         "max_output_tokens": self.settings.max_output_tokens,
                     },
@@ -114,7 +126,7 @@ class ProviderGateway:
                 data = await self._post(
                     "https://generativelanguage.googleapis.com/v1beta/models/"
                     f"{self.settings.model(provider)}:generateContent",
-                    {"x-goog-api-key": key},
+                    {"x-goog-api-key": key or ""},
                     {
                         "systemInstruction": {
                             "parts": [{"text": self.settings.system_prompt}]
@@ -126,6 +138,24 @@ class ProviderGateway:
                     },
                 )
                 answer = self._gemini_text(data)
+            elif provider == "custom":
+                base_url = self.settings.custom_openai_base_url
+                if not base_url:
+                    raise ProviderError("CUSTOM_OPENAI_BASE_URL is not configured")
+                headers = {"Authorization": f"Bearer {key}"} if key else {}
+                data = await self._post(
+                    f"{base_url}/chat/completions",
+                    headers,
+                    {
+                        "model": self.settings.model(provider),
+                        "messages": [
+                            {"role": "system", "content": self.settings.system_prompt},
+                            *messages,
+                        ],
+                        "max_tokens": self.settings.max_output_tokens,
+                    },
+                )
+                answer = self._chat_completion_text(data)
             else:
                 base = (
                     "https://api.x.ai/v1/chat/completions"
@@ -137,16 +167,15 @@ class ProviderGateway:
                     if self.settings.openrouter_site_url:
                         headers["HTTP-Referer"] = self.settings.openrouter_site_url
                     headers["X-Title"] = self.settings.openrouter_app_name
-                chat_messages = [
-                    {"role": "system", "content": self.settings.system_prompt},
-                    *messages,
-                ]
                 data = await self._post(
                     base,
                     headers,
                     {
                         "model": self.settings.model(provider),
-                        "messages": chat_messages,
+                        "messages": [
+                            {"role": "system", "content": self.settings.system_prompt},
+                            *messages,
+                        ],
                         "max_tokens": self.settings.max_output_tokens,
                     },
                 )
@@ -168,7 +197,9 @@ class ProviderGateway:
         response = await self.client.post(url, headers=headers, json=payload)
         if response.status_code >= 400:
             # Do not include request headers or response bodies in logs/errors.
-            raise ProviderError(f"HTTP {response.status_code}; проверь ключ, модель и лимиты")
+            raise ProviderError(
+                f"HTTP {response.status_code}; проверь ключ, модель и лимиты"
+            )
         try:
             result = response.json()
         except ValueError:
