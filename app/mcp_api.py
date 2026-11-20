@@ -80,7 +80,7 @@ def create_mcp_app(service: ChatService, access_token: str):
     mcp_app = server.streamable_http_app(
         json_response=True,
         stateless_http=True,
-        host="127.0.0.1",
+        host=service.settings.mcp_host,
     )
 
     @contextlib.asynccontextmanager
