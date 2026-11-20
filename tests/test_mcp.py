@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from starlette.testclient import TestClient
 
 from app.mcp_api import create_mcp_app
 
 
 class DummyService:
+    settings = SimpleNamespace(mcp_host="127.0.0.1", max_prompt_chars=8000)
+
     def available_providers(self) -> list[str]:
         return ["openrouter"]
 
