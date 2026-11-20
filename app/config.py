@@ -110,8 +110,14 @@ class Settings:
             (value("MCP_ENABLED") or "false").lower() in {"1", "true", "yes", "on"}
         )
         mcp_api_token = value("MCP_API_TOKEN")
+        mcp_host = (value("MCP_HOST") or "127.0.0.1").lower()
         if mcp_enabled and not mcp_api_token:
             raise ValueError("MCP_API_TOKEN is required when MCP_ENABLED=true")
+        if mcp_enabled and mcp_host not in {"127.0.0.1", "localhost"}:
+            raise ValueError(
+                "MCP_HOST must be 127.0.0.1 or localhost. Expose remote MCP access "
+                "only through a separately configured HTTPS reverse proxy."
+            )
 
         provider_keys = {
             "openai": value("OPENAI_API_KEY"),
@@ -160,7 +166,7 @@ class Settings:
             custom_openai_allow_insecure_http=allow_insecure_custom_http,
             mcp_enabled=mcp_enabled,
             mcp_api_token=mcp_api_token,
-            mcp_host=value("MCP_HOST") or "127.0.0.1",
+            mcp_host=mcp_host,
             mcp_port=mcp_port,
             max_concurrent_ai_requests=integer("MAX_CONCURRENT_AI_REQUESTS", 2, 1, 8),
             request_timeout_seconds=integer("AI_REQUEST_TIMEOUT_SECONDS", 45, 5, 180),
