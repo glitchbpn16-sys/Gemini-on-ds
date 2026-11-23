@@ -52,6 +52,8 @@ class ProviderGateway:
             "deepseek",
             "mistral",
             "cloudflare",
+            "nvidia",
+            "cohere",
             "custom",
         }:
             raise ProviderError("Неизвестный провайдер. Используй /providers.")
@@ -142,6 +144,23 @@ class ProviderGateway:
                     },
                 )
                 answer = self._gemini_text(data)
+            elif provider == "cohere":
+                data = await self._post(
+                    "https://api.cohere.com/v2/chat",
+                    {
+                        "Authorization": f"Bearer {key}",
+                        "X-Client-Name": "Glitch AI Bridge",
+                    },
+                    {
+                        "model": self.settings.model(provider),
+                        "messages": [
+                            {"role": "system", "content": self.settings.system_prompt},
+                            *messages,
+                        ],
+                        "max_tokens": self.settings.max_output_tokens,
+                    },
+                )
+                answer = self._cohere_text(data)
             elif provider == "custom":
                 base_url = self.settings.custom_openai_base_url
                 if not base_url:
@@ -167,6 +186,7 @@ class ProviderGateway:
                     "groq": "https://api.groq.com/openai/v1/chat/completions",
                     "deepseek": "https://api.deepseek.com/chat/completions",
                     "mistral": "https://api.mistral.ai/v1/chat/completions",
+                    "nvidia": "https://integrate.api.nvidia.com/v1/chat/completions",
                 }
                 if provider == "cloudflare":
                     account_id = self.settings.cloudflare_account_id
@@ -260,6 +280,22 @@ class ProviderGateway:
             part["text"]
             for part in parts
             if isinstance(part, dict) and isinstance(part.get("text"), str)
+        )
+
+    @staticmethod
+    def _cohere_text(data: dict[str, Any]) -> str:
+        message = data.get("message", {})
+        if not isinstance(message, dict):
+            raise ProviderError("Cohere вернул неожиданный формат message")
+        content = message.get("content", [])
+        if not isinstance(content, list):
+            raise ProviderError("Cohere вернул неожиданный формат message.content")
+        return "\n".join(
+            item.get("text", "")
+            for item in content
+            if isinstance(item, dict)
+            and item.get("type") == "text"
+            and isinstance(item.get("text"), str)
         )
 
     @staticmethod
