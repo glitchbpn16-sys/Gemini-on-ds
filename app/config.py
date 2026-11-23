@@ -20,6 +20,7 @@ DEFAULT_MODELS = {
     "cloudflare": "@cf/zai-org/glm-4.7-flash",
     "nvidia": "deepseek-ai/deepseek-v4-flash",
     "cohere": "command-a-plus-05-2026",
+    "sensenova": "sensenova-6.8-flash-lite",
 }
 
 
@@ -40,6 +41,8 @@ class Settings:
     cloudflare_account_id: str | None
     nvidia_api_key: str | None
     cohere_api_key: str | None
+    sensenova_api_key: str | None
+    sensenova_base_url: str
     default_provider: str
     fallback_order: tuple[str, ...]
     models: dict[str, str]
@@ -144,8 +147,27 @@ class Settings:
             "cloudflare": value("CLOUDFLARE_API_TOKEN"),
             "nvidia": value("NVIDIA_API_KEY"),
             "cohere": value("COHERE_API_KEY"),
+            "sensenova": value("SENSENOVA_API_KEY"),
         }
         cloudflare_account_id = value("CLOUDFLARE_ACCOUNT_ID")
+        sensenova_base_url = (
+            value("SENSENOVA_BASE_URL") or "https://token.sensenova.ai/v1"
+        ).rstrip("/")
+        sensenova_parts = urlsplit(sensenova_base_url)
+        if (
+            sensenova_parts.scheme != "https"
+            or sensenova_parts.hostname not in {"token.sensenova.ai", "token.sensenova.cn"}
+            or sensenova_parts.path != "/v1"
+            or sensenova_parts.username is not None
+            or sensenova_parts.password is not None
+            or sensenova_parts.query
+            or sensenova_parts.fragment
+            or sensenova_parts.port is not None
+        ):
+            raise ValueError(
+                "SENSENOVA_BASE_URL must be https://token.sensenova.ai/v1 "
+                "or https://token.sensenova.cn/v1"
+            )
         configured = [
             name for name, key in provider_keys.items()
             if key and (name != "cloudflare" or cloudflare_account_id)
@@ -182,6 +204,8 @@ class Settings:
             cloudflare_account_id=cloudflare_account_id,
             nvidia_api_key=provider_keys["nvidia"],
             cohere_api_key=provider_keys["cohere"],
+            sensenova_api_key=provider_keys["sensenova"],
+            sensenova_base_url=sensenova_base_url,
             default_provider=default_provider,
             fallback_order=fallback,
             models=models,
@@ -218,6 +242,7 @@ class Settings:
             "cloudflare": self.cloudflare_api_token if self.cloudflare_account_id else None,
             "nvidia": self.nvidia_api_key,
             "cohere": self.cohere_api_key,
+            "sensenova": self.sensenova_api_key,
             "custom": self.custom_openai_api_key,
         }
         return keys.get(provider)
@@ -231,6 +256,7 @@ class Settings:
             for provider in (
                 "openai", "anthropic", "gemini", "xai", "openrouter",
                 "groq", "deepseek", "mistral", "cloudflare", "nvidia", "cohere",
+                "sensenova",
             )
             if self.api_key(provider)
         ]
