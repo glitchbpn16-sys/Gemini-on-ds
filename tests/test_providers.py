@@ -22,6 +22,8 @@ def settings_for(monkeypatch: pytest.MonkeyPatch, provider: str) -> Settings:
         "deepseek": "DEEPSEEK_API_KEY",
         "mistral": "MISTRAL_API_KEY",
         "cloudflare": "CLOUDFLARE_API_TOKEN",
+        "nvidia": "NVIDIA_API_KEY",
+        "cohere": "COHERE_API_KEY",
     }
     for env_name in names.values():
         monkeypatch.delenv(env_name, raising=False)
@@ -64,6 +66,8 @@ def test_current_default_model_ids() -> None:
         "deepseek": "deepseek-flash",
         "mistral": "mistral-large-latest",
         "cloudflare": "@cf/meta/llama-3.1-8b-instruct",
+        "nvidia": "deepseek-ai/deepseek-v4-flash",
+        "cohere": "command-a-plus-05-2026",
     }
 
 
@@ -157,6 +161,16 @@ def test_openai_responses_request_uses_string_message_content(
             "https://api.cloudflare.com/client/v4/accounts/test-account/ai/v1/chat/completions",
             {"choices": [{"message": {"content": "Cloudflare ответ"}}]},
         ),
+        (
+            "nvidia",
+            "https://integrate.api.nvidia.com/v1/chat/completions",
+            {"choices": [{"message": {"content": "NVIDIA ответ"}}]},
+        ),
+        (
+            "cohere",
+            "https://api.cohere.com/v2/chat",
+            {"message": {"content": [{"type": "text", "text": "Cohere ответ"}]}},
+        ),
     ],
 )
 def test_provider_endpoint_headers_and_payload(
@@ -206,9 +220,16 @@ def test_provider_endpoint_headers_and_payload(
     elif provider_name == "mistral":
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "mistral-large-latest"
-    else:
+    elif provider_name == "cloudflare":
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "@cf/meta/llama-3.1-8b-instruct"
+    elif provider_name == "nvidia":
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
+        assert seen["body"]["model"] == "deepseek-ai/deepseek-v4-flash"
+    else:
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
+        assert seen["headers"]["x-client-name"] == "Glitch AI Bridge"
+        assert seen["body"]["model"] == "command-a-plus-05-2026"
 
 
 
@@ -251,3 +272,16 @@ def test_cloudflare_is_not_available_without_account_id(
     monkeypatch.delenv("AI_DEFAULT_PROVIDER", raising=False)
     settings = Settings.from_env()
     assert "cloudflare" not in settings.available_providers()
+
+
+def test_cohere_text_response_parser() -> None:
+    answer = ProviderGateway._cohere_text({
+        "message": {
+            "content": [
+                {"type": "text", "text": "first"},
+                {"type": "tool_call", "name": "unused", "parameters": {}},
+                {"type": "text", "text": "second"},
+            ]
+        }
+    })
+    assert answer == "first\\nsecond"
