@@ -47,6 +47,8 @@ Python 3.12+ и собственные токены платформ/API. Одн
 | DeepSeek | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | `https://api.deepseek.com` | API оплачивается по токенам |
 | Mistral | `MISTRAL_API_KEY`, `MISTRAL_MODEL` | `https://api.mistral.ai/v1` | Не считать постоянным бесплатным API; доступность trial зависит от аккаунта |
 | Cloudflare Workers AI | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_MODEL` | Workers AI OpenAI-compatible endpoint | 10 000 Neurons/day на Workers Free; некоторые модели требуют платного плана |
+| NVIDIA NIM | `NVIDIA_API_KEY`, `NVIDIA_MODEL` | `https://integrate.api.nvidia.com/v1/chat/completions` | Бесплатные hosted preview endpoints для прототипирования участникам NVIDIA Developer Program; квоты/очередь/список моделей меняются |
+| Cohere | `COHERE_API_KEY`, `COHERE_MODEL` | `https://api.cohere.com/v2/chat` | Бесплатный trial key: до 1000 API вызовов/месяц и 20 запросов/мин для Chat; проверяй ограничения конкретной модели |
 | Custom / Ollama | `CUSTOM_OPENAI_BASE_URL`, `CUSTOM_OPENAI_API_KEY`, `CUSTOM_OPENAI_MODEL` | Любой совместимый endpoint | Локальная модель без платы за токены; нагрузка ложится на твоё устройство/ПК |
 
 Стартовые model ID сверены с текущими каталогами API на 14 ноября 2026 года: `gpt-6-astra`, `claude-sonnet-5-5`, `gemini-3.8-flash`, `grok-4.7` и `openrouter/free`. Доступность всё равно зависит от аккаунта и региона; можно заменить любой ID в `.env`. Провайдеры меняют модели, тарифы и лимиты.
@@ -55,7 +57,7 @@ Python 3.12+ и собственные токены платформ/API. Одн
 - Discord: `/provider openrouter`
 - Telegram: `/provider openrouter`
 
-Доступные имена: `openai`, `anthropic`, `gemini`, `xai`, `openrouter`, `groq`, `deepseek`, `mistral`, `cloudflare`, `custom`. Для Cloudflare обязательно нужны и API token, и Account ID. Не настроенные ключами провайдеры не показываются. Если `AI_DEFAULT_PROVIDER` не задан, приложение выбирает OpenRouter, когда задан его ключ; иначе выбирает первый настроенный провайдер. OpenRouter по умолчанию использует `openrouter/free`, который выбирает совместимую бесплатную модель из доступных. Бесплатный доступ ограничен; лимиты, доступность и задержки меняются. Не включай платный fallback без отдельной проверки тарифа.
+Доступные имена: `openai`, `anthropic`, `gemini`, `xai`, `openrouter`, `groq`, `deepseek`, `mistral`, `cloudflare`, `nvidia`, `cohere`, `custom`. Для Cloudflare обязательно нужны и API token, и Account ID. Не настроенные ключами провайдеры не показываются. Если `AI_DEFAULT_PROVIDER` не задан, приложение выбирает OpenRouter, когда задан его ключ; иначе выбирает первый настроенный провайдер. OpenRouter по умолчанию использует `openrouter/free`, который выбирает совместимую бесплатную модель из доступных. Бесплатный доступ ограничен; лимиты, доступность и задержки меняются. Не включай платный fallback без отдельной проверки тарифа.
 
 Резервные провайдеры включаются только явно через `AI_FALLBACK_ORDER=openrouter,openai`. Учитывай, что fallback может вызвать платный API и дополнительный расход.
 
@@ -169,6 +171,10 @@ MCP — стандартный интерфейс для того, чтобы с
 Для Android-приложений Glitch Agent Connect и Jelly Bridge действует ещё более строгий профиль: без постоянного wake lock, фонового polling, автозапуска ИИ-агентов и непрерывного сканирования медиатеки; тяжёлые задачи только по действию пользователя, одна операция экспорта за раз, отмена/пауза, уменьшенный preview и термальный режим на слабых устройствах. Исходные медиа не перезаписываются автоматически.
 
 ## Free API limits and provider safety
+
+- **NVIDIA NIM API Catalog:** the hosted LLM endpoint is OpenAI Chat Completions-compatible at `https://integrate.api.nvidia.com/v1`. NVIDIA Developer Program members can access hosted endpoints for prototyping; model IDs, queue times and free limits vary by endpoint. The API catalog is the live source of model IDs. Docs: https://docs.api.nvidia.com/nim/reference/llm-apis and https://docs.api.nvidia.com/nim/docs/product
+- **Cohere:** trial keys are free but limited to 1,000 API calls/month; the Chat endpoint is limited to 20 requests/minute for trial keys. This integration uses Cohere Chat API v2. Docs: https://docs.cohere.com/v2/reference/chat and https://docs.cohere.com/docs/rate-limits
+
 
 No provider offers unlimited free hosted inference. The free routes may have low throughput, daily caps, queue delays, model availability changes, or provider-side data-use terms.
 
