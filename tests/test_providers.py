@@ -24,6 +24,7 @@ def settings_for(monkeypatch: pytest.MonkeyPatch, provider: str) -> Settings:
         "cloudflare": "CLOUDFLARE_API_TOKEN",
         "nvidia": "NVIDIA_API_KEY",
         "cohere": "COHERE_API_KEY",
+        "sensenova": "SENSENOVA_API_KEY",
     }
     for env_name in names.values():
         monkeypatch.delenv(env_name, raising=False)
@@ -32,6 +33,9 @@ def settings_for(monkeypatch: pytest.MonkeyPatch, provider: str) -> Settings:
         monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "test-account")
     else:
         monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
+    monkeypatch.delenv("SENSENOVA_BASE_URL", raising=False)
+    if provider == "sensenova":
+        monkeypatch.setenv("SENSENOVA_BASE_URL", "https://token.sensenova.ai/v1")
     monkeypatch.setenv("AI_DEFAULT_PROVIDER", provider)
     monkeypatch.delenv("AI_FALLBACK_ORDER", raising=False)
     return Settings.from_env()
@@ -68,6 +72,7 @@ def test_current_default_model_ids() -> None:
         "cloudflare": "@cf/zai-org/glm-4.7-flash",
         "nvidia": "deepseek-ai/deepseek-v4-flash",
         "cohere": "command-a-plus-05-2026",
+        "sensenova": "sensenova-6.8-flash-lite",
     }
 
 
@@ -171,6 +176,11 @@ def test_openai_responses_request_uses_string_message_content(
             "https://api.cohere.com/v2/chat",
             {"message": {"content": [{"type": "text", "text": "Cohere ответ"}]}},
         ),
+        (
+            "sensenova",
+            "https://token.sensenova.ai/v1/chat/completions",
+            {"choices": [{"message": {"content": "SenseNova ответ"}}]},
+        ),
     ],
 )
 def test_provider_endpoint_headers_and_payload(
@@ -226,10 +236,13 @@ def test_provider_endpoint_headers_and_payload(
     elif provider_name == "nvidia":
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "deepseek-ai/deepseek-v4-flash"
-    else:
+    elif provider_name == "cohere":
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["headers"]["x-client-name"] == "Glitch AI Bridge"
         assert seen["body"]["model"] == "command-a-plus-05-2026"
+    else:
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
+        assert seen["body"]["model"] == "sensenova-6.8-flash-lite"
 
 
 
@@ -289,3 +302,24 @@ def test_cohere_text_response_parser() -> None:
 
 def test_cloudflare_default_model_is_current() -> None:
     assert DEFAULT_MODELS["cloudflare"] == "@cf/zai-org/glm-4.7-flash"
+
+
+def test_sensenova_base_url_rejects_untrusted_hosts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SENSENOVA_API_KEY", "unit-test-token")
+    monkeypatch.setenv("SENSENOVA_BASE_URL", "https://attacker.example/v1")
+    monkeypatch.setenv("AI_DEFAULT_PROVIDER", "sensenova")
+    with pytest.raises(ValueError, match="SENSENOVA_BASE_URL"):
+        Settings.from_env()
+
+
+def test_sensenova_mainland_region_url_is_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SENSENOVA_API_KEY", "unit-test-token")
+    monkeypatch.setenv("SENSENOVA_BASE_URL", "https://token.sensenova.cn/v1")
+    monkeypatch.setenv("AI_DEFAULT_PROVIDER", "sensenova")
+    settings = Settings.from_env()
+    assert settings.sensenova_base_url == "https://token.sensenova.cn/v1"
+    assert "sensenova" in settings.available_providers()
