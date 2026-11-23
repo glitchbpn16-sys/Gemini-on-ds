@@ -57,7 +57,7 @@ Python 3.12+ и собственные токены платформ/API. Одн
 - Discord: `/provider openrouter`
 - Telegram: `/provider openrouter`
 
-Доступные имена: `openai`, `anthropic`, `gemini`, `xai`, `openrouter`, `groq`, `deepseek`, `mistral`, `cloudflare`, `nvidia`, `cohere`, `custom`. Для Cloudflare обязательно нужны и API token, и Account ID. Не настроенные ключами провайдеры не показываются. OpenRouter выбирается по умолчанию только если его ключ настроен. В остальных случаях `AI_DEFAULT_PROVIDER` требуется указать явно: бот не будет угадывать между потенциально платными API и отправлять запрос без осознанного выбора. OpenRouter по умолчанию использует `openrouter/free`, который выбирает совместимую бесплатную модель из доступных. Бесплатный доступ ограничен; лимиты, доступность и задержки меняются. Не включай платный fallback без отдельной проверки тарифа.
+Доступные имена: `openai`, `anthropic`, `gemini`, `xai`, `openrouter`, `groq`, `deepseek`, `mistral`, `cloudflare`, `nvidia`, `cohere`, `sensenova`, `custom`. Для Cloudflare обязательно нужны и API token, и Account ID. Не настроенные ключами провайдеры не показываются. OpenRouter выбирается по умолчанию только если его ключ настроен. В остальных случаях `AI_DEFAULT_PROVIDER` требуется указать явно: бот не будет угадывать между потенциально платными API и отправлять запрос без осознанного выбора. OpenRouter по умолчанию использует `openrouter/free`, который выбирает совместимую бесплатную модель из доступных. Бесплатный доступ ограничен; лимиты, доступность и задержки меняются. Не включай платный fallback без отдельной проверки тарифа.
 
 Резервные провайдеры включаются только явно через `AI_FALLBACK_ORDER=openrouter,openai`. Учитывай, что fallback может вызвать платный API и дополнительный расход.
 
@@ -198,3 +198,12 @@ Official references:
 - Hugging Face inference-provider pricing: https://huggingface.co/docs/inference-providers/pricing
 
 The bot does not add a payment method, buy credits, enable paid fallbacks, or bypass quotas. Keep fallback disabled unless every provider in the fallback order is acceptable to incur charges.
+
+
+### SenseNova Public Beta
+
+- International API: `https://token.sensenova.ai/v1`; Mainland China API: `https://token.sensenova.cn/v1`. The API key must come from the same region as the selected URL.
+- Current Flash-Lite model ID: `sensenova-6.8-flash-lite`. The U1 Fast model is a specialized image-generation model, not a normal chat-completions model.
+- SenseNova currently lists free public-beta access at 1,500 calls per model per rolling five-hour window for selected models. The quota is subject to beta availability and may change.
+- This adapter uses the OpenAI-compatible Chat Completions API; no Anthropic tool-call adapter is configured here.
+- Source references: https://www.sensenova.ai/token-plan and https://github.com/OpenSenseNova/SenseNova-Skills/blob/main/INSTALL.md
