@@ -29,7 +29,7 @@ def run_gateway(settings: Settings, handler: Any) -> tuple[str, str, dict[str, A
 
 
 def test_custom_openai_compatible_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("AI_DEFAULT_PROVIDER", raising=False)
+    monkeypatch.setenv("AI_DEFAULT_PROVIDER", "custom")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("CUSTOM_OPENAI_BASE_URL", "http://127.0.0.1:11434/v1")
