@@ -9,6 +9,7 @@
 - **Gemini** через Gemini Developer API.
 - **Grok** через совместимый chat-completions API xAI.
 - **OpenRouter** через единый API для выбора моделей разных поставщиков.
+- **Groq**, **DeepSeek**, **Mistral** и **Cloudflare Workers AI** через совместимый Chat Completions API.
 - Discord slash-команды: `/ask`, `/provider`, `/providers`, `/clear`.
 - Telegram: `/ask`, `/provider`, `/providers`, `/clear` и обычные сообщения в личном чате.
 - Bearer-защищённый HTTP endpoint для интеграции с модами и собственными серверами: `POST /v1/mods/message`.
@@ -35,13 +36,18 @@ Python 3.12+ и собственные токены платформ/API. Одн
 
 ## Провайдеры и модели
 
-| Провайдер | Переменные | API |
-|---|---|---|
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODEL` | Responses API |
-| Claude | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Messages API |
-| Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` | generateContent |
-| Grok | `XAI_API_KEY`, `XAI_MODEL` | xAI chat completions |
-| OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | OpenAI-compatible chat completions |
+| Провайдер | Переменные | API / endpoint | Бесплатность |
+|---|---|---|---|
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODEL` | Responses API | API отдельно оплачивается |
+| Claude | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Messages API | API отдельно оплачивается |
+| Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` | Gemini Developer API | Бесплатный уровень для отдельных моделей, с лимитами и компромиссом по приватности |
+| Grok | `XAI_API_KEY`, `XAI_MODEL` | xAI Chat Completions | Не считать бесплатным |
+| OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | OpenAI-compatible Chat Completions | Есть бесплатные маршруты с суточными лимитами |
+| Groq | `GROQ_API_KEY`, `GROQ_MODEL` | `https://api.groq.com/openai/v1` | Есть бесплатный доступ с переменными квотами; точные лимиты смотри в Console |
+| DeepSeek | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | `https://api.deepseek.com` | API оплачивается по токенам |
+| Mistral | `MISTRAL_API_KEY`, `MISTRAL_MODEL` | `https://api.mistral.ai/v1` | Не считать постоянным бесплатным API; доступность trial зависит от аккаунта |
+| Cloudflare Workers AI | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_MODEL` | Workers AI OpenAI-compatible endpoint | 10 000 Neurons/day на Workers Free; некоторые модели требуют платного плана |
+| Custom / Ollama | `CUSTOM_OPENAI_BASE_URL`, `CUSTOM_OPENAI_API_KEY`, `CUSTOM_OPENAI_MODEL` | Любой совместимый endpoint | Локальная модель без платы за токены; нагрузка ложится на твоё устройство/ПК |
 
 Стартовые model ID сверены с текущими каталогами API на 14 ноября 2026 года: `gpt-6-astra`, `claude-sonnet-5-5`, `gemini-3.8-flash`, `grok-4.7` и `openrouter/free`. Доступность всё равно зависит от аккаунта и региона; можно заменить любой ID в `.env`. Провайдеры меняют модели, тарифы и лимиты.
 
@@ -49,7 +55,7 @@ Python 3.12+ и собственные токены платформ/API. Одн
 - Discord: `/provider openrouter`
 - Telegram: `/provider openrouter`
 
-Доступные имена: `openai`, `anthropic`, `gemini`, `xai`, `openrouter`. Не настроенные ключами провайдеры не показываются. Если `AI_DEFAULT_PROVIDER` не задан, приложение выбирает OpenRouter, когда задан его ключ; иначе выбирает первый настроенный провайдер. OpenRouter по умолчанию использует `openrouter/free`, который выбирает совместимую бесплатную модель из доступных. Бесплатный доступ ограничен; лимиты, доступность и задержки меняются. Не включай платный fallback без отдельной проверки тарифа.
+Доступные имена: `openai`, `anthropic`, `gemini`, `xai`, `openrouter`, `groq`, `deepseek`, `mistral`, `cloudflare`, `custom`. Для Cloudflare обязательно нужны и API token, и Account ID. Не настроенные ключами провайдеры не показываются. Если `AI_DEFAULT_PROVIDER` не задан, приложение выбирает OpenRouter, когда задан его ключ; иначе выбирает первый настроенный провайдер. OpenRouter по умолчанию использует `openrouter/free`, который выбирает совместимую бесплатную модель из доступных. Бесплатный доступ ограничен; лимиты, доступность и задержки меняются. Не включай платный fallback без отдельной проверки тарифа.
 
 Резервные провайдеры включаются только явно через `AI_FALLBACK_ORDER=openrouter,openai`. Учитывай, что fallback может вызвать платный API и дополнительный расход.
 
@@ -161,3 +167,28 @@ MCP — стандартный интерфейс для того, чтобы с
 - MCP включён только по явному флагу и локально привязан к loopback по умолчанию.
 
 Для Android-приложений Glitch Agent Connect и Jelly Bridge действует ещё более строгий профиль: без постоянного wake lock, фонового polling, автозапуска ИИ-агентов и непрерывного сканирования медиатеки; тяжёлые задачи только по действию пользователя, одна операция экспорта за раз, отмена/пауза, уменьшенный preview и термальный режим на слабых устройствах. Исходные медиа не перезаписываются автоматически.
+
+## Free API limits and provider safety
+
+No provider offers unlimited free hosted inference. The free routes may have low throughput, daily caps, queue delays, model availability changes, or provider-side data-use terms.
+
+- **OpenRouter Free:** use `OPENROUTER_MODEL=openrouter/free` or an explicitly listed `:free` model. The published limit for `:free` variants is 20 requests/minute and 50/day. Failed attempts count against the daily quota. A displayed $0 model is not always a `:free` model and may still require a funded account.
+- **Google AI Studio:** selected Gemini models have free input/output tokens. Google marks free-tier content as usable to improve its products. Do not submit private source code, tokens, passwords, private messages or personal data through this tier.
+- **Groq:** a free access tier exists, but rate limits are model- and account-specific. The model quota shown in Groq Console is authoritative; do not assume a single global limit.
+- **Cloudflare Workers AI:** the Workers Free plan includes 10,000 Neurons/day, resetting at 00:00 UTC. Consumption varies by model; some newer models require a paid plan or prepaid credits.
+- **Cerebras:** the current trial advertises $5 in promotional credits, but receiving them requires adding a valid payment method; it is therefore not included in the no-card free setup.
+- **Hugging Face Inference Providers:** Free accounts currently have no included monthly inference credits; use a paid credit balance or another provider.
+- **DeepSeek, Mistral, OpenAI, Anthropic and xAI:** treat API calls as billable unless the provider dashboard explicitly shows a free trial or zero-cost quota for that exact account/model.
+- **Local Ollama/llama.cpp/LM Studio:** no per-token API charge, but inference uses local RAM, storage, processor and battery. On a low-memory PC or phone, smaller quantized models may be necessary.
+
+Official references:
+- Gemini pricing and data-use note: https://ai.google.dev/gemini-api/docs/pricing
+- OpenRouter free models and request caps: https://openrouter.ai/collections/free-models/
+- Groq current rate limits: https://console.groq.com/docs/rate-limits
+- Cloudflare Workers AI pricing: https://developers.cloudflare.com/workers-ai/platform/pricing/
+- DeepSeek Responses API and current model/pricing details: https://api-docs.deepseek.com/guides/responses_api/ and https://api-docs.deepseek.com/quick_start/pricing/
+- Mistral Chat Completions and model list: https://docs.mistral.ai/api/endpoint/chat/ and https://docs.mistral.ai/api/endpoint/models
+- Cerebras trial terms: https://www.cerebras.ai/pricing
+- Hugging Face inference-provider pricing: https://huggingface.co/docs/inference-providers/pricing
+
+The bot does not add a payment method, buy credits, enable paid fallbacks, or bypass quotas. Keep fallback disabled unless every provider in the fallback order is acceptable to incur charges.
