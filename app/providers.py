@@ -54,6 +54,7 @@ class ProviderGateway:
             "cloudflare",
             "nvidia",
             "cohere",
+            "sensenova",
             "custom",
         }:
             raise ProviderError("Неизвестный провайдер. Используй /providers.")
@@ -197,6 +198,8 @@ class ProviderGateway:
                         + account_id
                         + "/ai/v1/chat/completions"
                     )
+                elif provider == "sensenova":
+                    endpoint = self.settings.sensenova_base_url.rstrip("/") + "/chat/completions"
                 else:
                     endpoint = endpoints[provider]
 
