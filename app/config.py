@@ -17,7 +17,7 @@ DEFAULT_MODELS = {
     "groq": "qwen/qwen3.8-27b",
     "deepseek": "deepseek-flash",
     "mistral": "mistral-large-latest",
-    "cloudflare": "@cf/meta/llama-3.1-8b-instruct",
+    "cloudflare": "@cf/zai-org/glm-4.7-flash",
     "nvidia": "deepseek-ai/deepseek-v4-flash",
     "cohere": "command-a-plus-05-2026",
 }
@@ -154,15 +154,17 @@ class Settings:
             configured.append("custom")
 
         requested_provider = value("AI_DEFAULT_PROVIDER")
-        default_provider = (
-            requested_provider.lower()
-            if requested_provider
-            else (
-                "openrouter"
-                if provider_keys["openrouter"]
-                else configured[0] if configured else "openrouter"
+        if requested_provider:
+            default_provider = requested_provider.lower()
+        elif provider_keys["openrouter"]:
+            default_provider = "openrouter"
+        elif configured:
+            raise ValueError(
+                "Set AI_DEFAULT_PROVIDER explicitly. The bot will not guess a provider "
+                "because some API keys are billed per token."
             )
-        )
+        else:
+            default_provider = "openrouter"
 
         return cls(
             discord_token=value("DISCORD_BOT_TOKEN"),
