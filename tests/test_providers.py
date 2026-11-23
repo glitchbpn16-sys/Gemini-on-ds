@@ -18,10 +18,18 @@ def settings_for(monkeypatch: pytest.MonkeyPatch, provider: str) -> Settings:
         "gemini": "GEMINI_API_KEY",
         "xai": "XAI_API_KEY",
         "openrouter": "OPENROUTER_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
+        "cloudflare": "CLOUDFLARE_API_TOKEN",
     }
     for env_name in names.values():
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setenv(names[provider], "unit-test-token")
+    if provider == "cloudflare":
+        monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "test-account")
+    else:
+        monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
     monkeypatch.setenv("AI_DEFAULT_PROVIDER", provider)
     monkeypatch.delenv("AI_FALLBACK_ORDER", raising=False)
     return Settings.from_env()
@@ -52,6 +60,10 @@ def test_current_default_model_ids() -> None:
         "gemini": "gemini-3.8-flash",
         "xai": "grok-4.7",
         "openrouter": "openrouter/free",
+        "groq": "qwen/qwen3.8-27b",
+        "deepseek": "deepseek-flash",
+        "mistral": "mistral-large-latest",
+        "cloudflare": "@cf/meta/llama-3.1-8b-instruct",
     }
 
 
@@ -125,6 +137,26 @@ def test_openai_responses_request_uses_string_message_content(
             "https://openrouter.ai/api/v1/chat/completions",
             {"choices": [{"message": {"content": "OpenRouter ответ"}}]},
         ),
+        (
+            "groq",
+            "https://api.groq.com/openai/v1/chat/completions",
+            {"choices": [{"message": {"content": "Groq ответ"}}]},
+        ),
+        (
+            "deepseek",
+            "https://api.deepseek.com/chat/completions",
+            {"choices": [{"message": {"content": "DeepSeek ответ"}}]},
+        ),
+        (
+            "mistral",
+            "https://api.mistral.ai/v1/chat/completions",
+            {"choices": [{"message": {"content": "Mistral ответ"}}]},
+        ),
+        (
+            "cloudflare",
+            "https://api.cloudflare.com/client/v4/accounts/test-account/ai/v1/chat/completions",
+            {"choices": [{"message": {"content": "Cloudflare ответ"}}]},
+        ),
     ],
 )
 def test_provider_endpoint_headers_and_payload(
@@ -160,11 +192,23 @@ def test_provider_endpoint_headers_and_payload(
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "grok-4.7"
         assert seen["body"]["messages"][0]["role"] == "system"
-    else:
+    elif provider_name == "openrouter":
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "openrouter/free"
         assert seen["headers"]["x-title"] == "Glitch AI Bridge"
         assert seen["body"]["messages"][0]["role"] == "system"
+    elif provider_name == "groq":
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
+        assert seen["body"]["model"] == "qwen/qwen3.8-27b"
+    elif provider_name == "deepseek":
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
+        assert seen["body"]["model"] == "deepseek-flash"
+    elif provider_name == "mistral":
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
+        assert seen["body"]["model"] == "mistral-large-latest"
+    else:
+        assert seen["headers"]["authorization"] == "Bearer unit-test-token"
+        assert seen["body"]["model"] == "@cf/meta/llama-3.1-8b-instruct"
 
 
 
@@ -197,3 +241,13 @@ def test_explicit_default_provider_is_respected(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "claude-token")
     settings = Settings.from_env()
     assert settings.default_provider == "anthropic"
+
+
+def test_cloudflare_is_not_available_without_account_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "unit-test-token")
+    monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
+    monkeypatch.delenv("AI_DEFAULT_PROVIDER", raising=False)
+    settings = Settings.from_env()
+    assert "cloudflare" not in settings.available_providers()
