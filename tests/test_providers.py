@@ -65,7 +65,7 @@ def test_current_default_model_ids() -> None:
         "groq": "qwen/qwen3.8-27b",
         "deepseek": "deepseek-flash",
         "mistral": "mistral-large-latest",
-        "cloudflare": "@cf/meta/llama-3.1-8b-instruct",
+        "cloudflare": "@cf/zai-org/glm-4.7-flash",
         "nvidia": "deepseek-ai/deepseek-v4-flash",
         "cohere": "command-a-plus-05-2026",
     }
@@ -222,7 +222,7 @@ def test_provider_endpoint_headers_and_payload(
         assert seen["body"]["model"] == "mistral-large-latest"
     elif provider_name == "cloudflare":
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
-        assert seen["body"]["model"] == "@cf/meta/llama-3.1-8b-instruct"
+        assert seen["body"]["model"] == "@cf/zai-org/glm-4.7-flash"
     elif provider_name == "nvidia":
         assert seen["headers"]["authorization"] == "Bearer unit-test-token"
         assert seen["body"]["model"] == "deepseek-ai/deepseek-v4-flash"
@@ -243,15 +243,15 @@ def test_default_provider_prefers_openrouter_when_available(
     assert settings.default_provider == "openrouter"
 
 
-def test_default_provider_falls_back_to_first_configured_provider(
+def test_billable_provider_requires_explicit_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("AI_DEFAULT_PROVIDER", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "openai-token")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "claude-token")
-    settings = Settings.from_env()
-    assert settings.default_provider == "openai"
+    with pytest.raises(ValueError, match="AI_DEFAULT_PROVIDER explicitly"):
+        Settings.from_env()
 
 
 def test_explicit_default_provider_is_respected(
@@ -285,3 +285,7 @@ def test_cohere_text_response_parser() -> None:
         }
     })
     assert answer == "first\nsecond"
+
+
+def test_cloudflare_default_model_is_current() -> None:
+    assert DEFAULT_MODELS["cloudflare"] == "@cf/zai-org/glm-4.7-flash"
