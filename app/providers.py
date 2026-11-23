@@ -48,6 +48,10 @@ class ProviderGateway:
             "gemini",
             "xai",
             "openrouter",
+            "groq",
+            "deepseek",
+            "mistral",
+            "cloudflare",
             "custom",
         }:
             raise ProviderError("Неизвестный провайдер. Используй /providers.")
@@ -157,18 +161,32 @@ class ProviderGateway:
                 )
                 answer = self._chat_completion_text(data)
             else:
-                base = (
-                    "https://api.x.ai/v1/chat/completions"
-                    if provider == "xai"
-                    else "https://openrouter.ai/api/v1/chat/completions"
-                )
+                endpoints = {
+                    "xai": "https://api.x.ai/v1/chat/completions",
+                    "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+                    "groq": "https://api.groq.com/openai/v1/chat/completions",
+                    "deepseek": "https://api.deepseek.com/chat/completions",
+                    "mistral": "https://api.mistral.ai/v1/chat/completions",
+                }
+                if provider == "cloudflare":
+                    account_id = self.settings.cloudflare_account_id
+                    if not account_id:
+                        raise ProviderError("CLOUDFLARE_ACCOUNT_ID is required")
+                    endpoint = (
+                        "https://api.cloudflare.com/client/v4/accounts/"
+                        + account_id
+                        + "/ai/v1/chat/completions"
+                    )
+                else:
+                    endpoint = endpoints[provider]
+
                 headers = {"Authorization": f"Bearer {key}"}
                 if provider == "openrouter":
                     if self.settings.openrouter_site_url:
                         headers["HTTP-Referer"] = self.settings.openrouter_site_url
                     headers["X-Title"] = self.settings.openrouter_app_name
                 data = await self._post(
-                    base,
+                    endpoint,
                     headers,
                     {
                         "model": self.settings.model(provider),
