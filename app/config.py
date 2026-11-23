@@ -14,6 +14,10 @@ DEFAULT_MODELS = {
     "gemini": "gemini-3.8-flash",
     "xai": "grok-4.7",
     "openrouter": "openrouter/free",
+    "groq": "qwen/qwen3.8-27b",
+    "deepseek": "deepseek-flash",
+    "mistral": "mistral-large-latest",
+    "cloudflare": "@cf/meta/llama-3.1-8b-instruct",
 }
 
 
@@ -27,6 +31,11 @@ class Settings:
     gemini_api_key: str | None
     xai_api_key: str | None
     openrouter_api_key: str | None
+    groq_api_key: str | None
+    deepseek_api_key: str | None
+    mistral_api_key: str | None
+    cloudflare_api_token: str | None
+    cloudflare_account_id: str | None
     default_provider: str
     fallback_order: tuple[str, ...]
     models: dict[str, str]
@@ -125,8 +134,16 @@ class Settings:
             "gemini": value("GEMINI_API_KEY"),
             "xai": value("XAI_API_KEY"),
             "openrouter": value("OPENROUTER_API_KEY"),
+            "groq": value("GROQ_API_KEY"),
+            "deepseek": value("DEEPSEEK_API_KEY"),
+            "mistral": value("MISTRAL_API_KEY"),
+            "cloudflare": value("CLOUDFLARE_API_TOKEN"),
         }
-        configured = [name for name, key in provider_keys.items() if key]
+        cloudflare_account_id = value("CLOUDFLARE_ACCOUNT_ID")
+        configured = [
+            name for name, key in provider_keys.items()
+            if key and (name != "cloudflare" or cloudflare_account_id)
+        ]
         if custom_base_url:
             configured.append("custom")
 
@@ -150,6 +167,11 @@ class Settings:
             gemini_api_key=provider_keys["gemini"],
             xai_api_key=provider_keys["xai"],
             openrouter_api_key=provider_keys["openrouter"],
+            groq_api_key=provider_keys["groq"],
+            deepseek_api_key=provider_keys["deepseek"],
+            mistral_api_key=provider_keys["mistral"],
+            cloudflare_api_token=provider_keys["cloudflare"],
+            cloudflare_account_id=cloudflare_account_id,
             default_provider=default_provider,
             fallback_order=fallback,
             models=models,
@@ -180,6 +202,10 @@ class Settings:
             "gemini": self.gemini_api_key,
             "xai": self.xai_api_key,
             "openrouter": self.openrouter_api_key,
+            "groq": self.groq_api_key,
+            "deepseek": self.deepseek_api_key,
+            "mistral": self.mistral_api_key,
+            "cloudflare": self.cloudflare_api_token if self.cloudflare_account_id else None,
             "custom": self.custom_openai_api_key,
         }
         return keys.get(provider)
@@ -190,7 +216,10 @@ class Settings:
     def available_providers(self) -> list[str]:
         providers = [
             provider
-            for provider in ("openai", "anthropic", "gemini", "xai", "openrouter")
+            for provider in (
+                "openai", "anthropic", "gemini", "xai", "openrouter",
+                "groq", "deepseek", "mistral", "cloudflare",
+            )
             if self.api_key(provider)
         ]
         if self.custom_openai_base_url:
