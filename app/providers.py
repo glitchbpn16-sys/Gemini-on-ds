@@ -48,6 +48,13 @@ class ProviderGateway:
             "gemini",
             "xai",
             "openrouter",
+            "groq",
+            "deepseek",
+            "mistral",
+            "cloudflare",
+            "nvidia",
+            "cohere",
+            "sensenova",
             "custom",
         }:
             raise ProviderError("Неизвестный провайдер. Используй /providers.")
@@ -138,6 +145,23 @@ class ProviderGateway:
                     },
                 )
                 answer = self._gemini_text(data)
+            elif provider == "cohere":
+                data = await self._post(
+                    "https://api.cohere.com/v2/chat",
+                    {
+                        "Authorization": f"Bearer {key}",
+                        "X-Client-Name": "Glitch AI Bridge",
+                    },
+                    {
+                        "model": self.settings.model(provider),
+                        "messages": [
+                            {"role": "system", "content": self.settings.system_prompt},
+                            *messages,
+                        ],
+                        "max_tokens": self.settings.max_output_tokens,
+                    },
+                )
+                answer = self._cohere_text(data)
             elif provider == "custom":
                 base_url = self.settings.custom_openai_base_url
                 if not base_url:
@@ -157,18 +181,35 @@ class ProviderGateway:
                 )
                 answer = self._chat_completion_text(data)
             else:
-                base = (
-                    "https://api.x.ai/v1/chat/completions"
-                    if provider == "xai"
-                    else "https://openrouter.ai/api/v1/chat/completions"
-                )
+                endpoints = {
+                    "xai": "https://api.x.ai/v1/chat/completions",
+                    "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+                    "groq": "https://api.groq.com/openai/v1/chat/completions",
+                    "deepseek": "https://api.deepseek.com/chat/completions",
+                    "mistral": "https://api.mistral.ai/v1/chat/completions",
+                    "nvidia": "https://integrate.api.nvidia.com/v1/chat/completions",
+                }
+                if provider == "cloudflare":
+                    account_id = self.settings.cloudflare_account_id
+                    if not account_id:
+                        raise ProviderError("CLOUDFLARE_ACCOUNT_ID is required")
+                    endpoint = (
+                        "https://api.cloudflare.com/client/v4/accounts/"
+                        + account_id
+                        + "/ai/v1/chat/completions"
+                    )
+                elif provider == "sensenova":
+                    endpoint = self.settings.sensenova_base_url.rstrip("/") + "/chat/completions"
+                else:
+                    endpoint = endpoints[provider]
+
                 headers = {"Authorization": f"Bearer {key}"}
                 if provider == "openrouter":
                     if self.settings.openrouter_site_url:
                         headers["HTTP-Referer"] = self.settings.openrouter_site_url
                     headers["X-Title"] = self.settings.openrouter_app_name
                 data = await self._post(
-                    base,
+                    endpoint,
                     headers,
                     {
                         "model": self.settings.model(provider),
@@ -242,6 +283,22 @@ class ProviderGateway:
             part["text"]
             for part in parts
             if isinstance(part, dict) and isinstance(part.get("text"), str)
+        )
+
+    @staticmethod
+    def _cohere_text(data: dict[str, Any]) -> str:
+        message = data.get("message", {})
+        if not isinstance(message, dict):
+            raise ProviderError("Cohere вернул неожиданный формат message")
+        content = message.get("content", [])
+        if not isinstance(content, list):
+            raise ProviderError("Cohere вернул неожиданный формат message.content")
+        return "\n".join(
+            item.get("text", "")
+            for item in content
+            if isinstance(item, dict)
+            and item.get("type") == "text"
+            and isinstance(item.get("text"), str)
         )
 
     @staticmethod
