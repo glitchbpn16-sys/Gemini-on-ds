@@ -284,4 +284,4 @@ def test_cohere_text_response_parser() -> None:
             ]
         }
     })
-    assert answer == "first\\nsecond"
+    assert answer == "first\nsecond"
