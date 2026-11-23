@@ -18,6 +18,8 @@ DEFAULT_MODELS = {
     "deepseek": "deepseek-flash",
     "mistral": "mistral-large-latest",
     "cloudflare": "@cf/meta/llama-3.1-8b-instruct",
+    "nvidia": "deepseek-ai/deepseek-v4-flash",
+    "cohere": "command-a-plus-05-2026",
 }
 
 
@@ -36,6 +38,8 @@ class Settings:
     mistral_api_key: str | None
     cloudflare_api_token: str | None
     cloudflare_account_id: str | None
+    nvidia_api_key: str | None
+    cohere_api_key: str | None
     default_provider: str
     fallback_order: tuple[str, ...]
     models: dict[str, str]
@@ -138,6 +142,8 @@ class Settings:
             "deepseek": value("DEEPSEEK_API_KEY"),
             "mistral": value("MISTRAL_API_KEY"),
             "cloudflare": value("CLOUDFLARE_API_TOKEN"),
+            "nvidia": value("NVIDIA_API_KEY"),
+            "cohere": value("COHERE_API_KEY"),
         }
         cloudflare_account_id = value("CLOUDFLARE_ACCOUNT_ID")
         configured = [
@@ -172,6 +178,8 @@ class Settings:
             mistral_api_key=provider_keys["mistral"],
             cloudflare_api_token=provider_keys["cloudflare"],
             cloudflare_account_id=cloudflare_account_id,
+            nvidia_api_key=provider_keys["nvidia"],
+            cohere_api_key=provider_keys["cohere"],
             default_provider=default_provider,
             fallback_order=fallback,
             models=models,
@@ -206,6 +214,8 @@ class Settings:
             "deepseek": self.deepseek_api_key,
             "mistral": self.mistral_api_key,
             "cloudflare": self.cloudflare_api_token if self.cloudflare_account_id else None,
+            "nvidia": self.nvidia_api_key,
+            "cohere": self.cohere_api_key,
             "custom": self.custom_openai_api_key,
         }
         return keys.get(provider)
@@ -218,7 +228,7 @@ class Settings:
             provider
             for provider in (
                 "openai", "anthropic", "gemini", "xai", "openrouter",
-                "groq", "deepseek", "mistral", "cloudflare",
+                "groq", "deepseek", "mistral", "cloudflare", "nvidia", "cohere",
             )
             if self.api_key(provider)
         ]
