@@ -43,10 +43,15 @@ jobs:
           AUTH_HEADER="$(printf 'oauth2:%s' "${GITLAB_MIRROR_TOKEN}" | base64 -w 0)"
           TARGET_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}.git"
 
-          # Push all source branches and tags. No --mirror and no force push:
-          # divergent GitLab refs are refused rather than overwritten/deleted.
-          git -c http.extraheader="AUTHORIZATION: Basic ${AUTH_HEADER}" push "${TARGET_URL}" 'refs/remotes/origin/*:refs/heads/*'
+          # Push each fetched origin branch separately, excluding symbolic origin/HEAD.
+          # No --mirror and no force push: divergent GitLab refs are never overwritten/deleted.
+          while IFS= read -r source_ref; do
+            branch_name="${source_ref#refs/remotes/origin/}"
+            [[ "${branch_name}" == "HEAD" ]] && continue
+            git -c http.extraheader="AUTHORIZATION: Basic ${AUTH_HEADER}" push "${TARGET_URL}" "${source_ref}:refs/heads/${branch_name}"
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin)
+
           git -c http.extraheader="AUTHORIZATION: Basic ${AUTH_HEADER}" push "${TARGET_URL}" 'refs/tags/*:refs/tags/*'
 
           unset AUTH_HEADER GITLAB_MIRROR_TOKEN
-          echo "GitHub branches and tags were pushed to ${GITLAB_PROJECT_PATH}."
+          echo "GitHub branches and tags were pushed to the target GitLab project."
