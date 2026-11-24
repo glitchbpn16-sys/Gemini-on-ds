@@ -1,0 +1,52 @@
+name: Mirror to GitLab
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitlab-mirror-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Push branches and tags to the linked GitLab project
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout all GitHub branches and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate GitLab token
+        env:
+          GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GITLAB_MIRROR_TOKEN}" ]]; then
+            echo "::error::Create the GITLAB_MIRROR_TOKEN repository secret first. Never paste the token into the workflow."
+            exit 1
+          fi
+          echo "GitLab token secret is present."
+
+      - name: Push source refs without deleting remote refs
+        env:
+          GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
+          GITLAB_PROJECT_PATH: "glitch-group2343546/glitch-project"
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          AUTH_HEADER="$(printf 'oauth2:%s' "${GITLAB_MIRROR_TOKEN}" | base64 -w 0)"
+          TARGET_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}.git"
+
+          # Push all source branches and tags. No --mirror and no force push:
+          # divergent GitLab refs are refused rather than overwritten/deleted.
+          git -c http.extraheader="AUTHORIZATION: Basic ${AUTH_HEADER}" push "${TARGET_URL}" 'refs/remotes/origin/*:refs/heads/*'
+          git -c http.extraheader="AUTHORIZATION: Basic ${AUTH_HEADER}" push "${TARGET_URL}" 'refs/tags/*:refs/tags/*'
+
+          unset AUTH_HEADER GITLAB_MIRROR_TOKEN
+          echo "GitHub branches and tags were pushed to ${GITLAB_PROJECT_PATH}."
